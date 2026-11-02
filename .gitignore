@@ -1,7 +1,7 @@
 # ============================================================
-# 跑步模拟器 / RunSimulator — GitHub 上传排除规则
-# 仓库只提交源码、构建脚本、测试与文档；APK 由 GitHub Actions
-# 编译后附加到 Release。逐项说明见 GITHUB_RELEASE_GUIDE.md。
+# 运动数据生成器 / RunDataGenerator — GitHub 上传排除规则
+# 仓库只提交源码、Gradle 配置、测试与文档；APK 由 Actions 构建。
+# 逐项说明见 GITHUB_RELEASE_GUIDE.md。
 # ============================================================
 
 # --- Android / Gradle 构建产物 -------------------------------
@@ -18,8 +18,9 @@ captures/
 lint-results*.xml
 lint-results*.html
 
-# 本地 SDK 路径、签名与密钥（严禁提交）-----------------------
+# --- 本地 SDK、签名与密钥（严禁提交）-------------------------
 local.properties
+.tools/
 keystore.properties
 signing.properties
 *.jks
@@ -28,40 +29,12 @@ signing.properties
 .env.*
 secrets.properties
 
-# --- 随附的本地 Android SDK / 工具链（约 727 MB）-------------
-.tools/
-.tools-location-reference.html
-reference-readme.txt
-audit-hashes.txt
-
-# --- CI / 发布产物 -------------------------------------------
-# dist 只保留说明文件；APK、idsig、源码 zip、测试截图不进入仓库。
-dist/*
-!dist/README.md
-
-# --- Python 控制台 keep-data-sim-main ------------------------
-**/__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.coverage
-.coverage.*
-htmlcov/
-**/.venv/
-**/venv/
-**/env/
-*.egg-info/
-keep-data-sim-main/outputs/
-keep-data-sim-main/test_data/
-
-# 生成的轨迹 / 运动数据文件
+# --- 本地发布、测试与生成数据 --------------------------------
+dist/
+test-output/
 *.gpx
 *.fit
 *.tcx
-
-# --- 测试与临时文件 ------------------------------------------
 test-results/
 playwright-report/
 node_modules/

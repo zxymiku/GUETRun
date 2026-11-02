@@ -11,13 +11,14 @@
 gradlew text eol=lf
 
 # 文本源码与文档。
-*.yml text eol=lf
-*.yaml text eol=lf
-*.md text eol=lf
+*.gradle text eol=lf
 *.java text eol=lf
-*.py text eol=lf
+*.xml text eol=lf
 *.html text eol=lf
 *.cjs text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 
 # 二进制文件不做换行转换。
 *.apk binary

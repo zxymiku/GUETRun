@@ -21,11 +21,4 @@ public final class RunMath {
         long s = Math.round(seconds);
         return String.format(java.util.Locale.ROOT, "%02d:%02d:%02d", s/3600, s/60%60, s%60);
     }
-    // A smooth circle in local WGS84 coordinates. The start point is exactly (lat, lon).
-    public static double[] point(double lat, double lon, double circumference, double distance) {
-        double radius = circumference / (2 * Math.PI);
-        double angle = distance / radius;
-        return new double[]{lat + radius * Math.sin(angle) / 111320,
-                lon + radius * (1 - Math.cos(angle)) / (111320 * Math.cos(Math.toRadians(lat)))};
-    }
 }

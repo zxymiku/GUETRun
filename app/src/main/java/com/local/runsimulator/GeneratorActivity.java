@@ -2,7 +2,7 @@ package com.local.runsimulator;
 
 import android.app.*;import android.content.*;import android.graphics.Color;import android.net.Uri;import android.os.*;import android.view.*;import android.widget.*;import java.io.*;import java.util.*;import java.time.*;import java.time.format.DateTimeFormatter;import java.util.concurrent.*;
 
-/** Mobile UI for the keep-data-sim generation pipeline. */
+/** Mobile UI for local GPX / FIT generation. */
 public final class GeneratorActivity extends Activity {
     private EditText distance,pace,lat,lon,radius,spacing,noise,hr,maxHr,gain,cadence,title,seed;private Spinner sport,strategy,format;private TextView result,totalTime,mapSummary;private CheckBox useMap,useLaps;private EditText lapCount;private MapRouteStore.Route savedRoute;
     private TextView startTime,endTime;
@@ -12,7 +12,7 @@ public final class GeneratorActivity extends Activity {
     private Runnable timeRefresh;private int timeRevision;private boolean formReady,destroyed;
     private Button generateButton;private File pendingExport;private String pendingSummary,pendingName,pendingType,lastType;private Uri lastUri;private boolean savePickerOpen;
     @Override public void onCreate(Bundle b){super.onCreate(b);ScrollView sc=new ScrollView(this);LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(28,36,28,28);box.setBackgroundColor(Color.rgb(246,248,250));sc.addView(box);setContentView(sc);
-        txt(box,"RUN / DATA LAB · 1.7",15,Color.rgb(0,119,101));txt(box,"手机运动数据生成器",28,Color.rgb(20,35,44));txt(box,"生成 GPX / FIT 时可自行选择保存位置。支持高德地图选点、田径跑道和手绘路线；地图浏览需要联网。",14,Color.DKGRAY);
+        txt(box,"RUN / DATA LAB · 2.0",15,Color.rgb(0,119,101));txt(box,"手机运动数据生成器",28,Color.rgb(20,35,44));txt(box,"生成 GPX / FIT 时可自行选择保存位置。支持高德地图选点、田径跑道和手绘路线；地图浏览需要联网。",14,Color.DKGRAY);
         sport=spin(box,"运动类型",new String[]{"跑步","骑行"});strategy=spin(box,"配速策略",new String[]{"匀速 constant","后半程加速 negative_split","后半程减速 positive_split","间歇 interval"});format=spin(box,"输出格式",new String[]{"GPX","FIT"});
         distance=in(box,"距离（公里）","5",false);pace=in(box,"跑步配速（分:秒/公里，也支持小数分钟）","6:00",true);
         totalTime=txt(box,"",22,Color.rgb(0,119,101));
@@ -51,7 +51,7 @@ public final class GeneratorActivity extends Activity {
         lat=in(box,"纬度（WGS84；默认路线圆心 / 地图路线起点）","39.9042",false);lon=in(box,"经度（WGS84）","116.4074",false);radius=in(box,"默认随机圆形半径（米；地图路线不使用）","800",false);spacing=in(box,"采样间距（米）","10",false);noise=in(box,"GPS 噪声（米；地图路线自动为 0）","3",false);hr=in(box,"平均心率","145",false);maxHr=in(box,"最大心率","190",false);gain=in(box,"总爬升（米）","50",false);cadence=in(box,"步频/踏频","170",false);title=in(box,"活动标题","模拟跑步",true);seed=in(box,"随机种子","42",false);
         useMap.setOnCheckedChangeListener((button,checked)->{getSharedPreferences("generator",MODE_PRIVATE).edit().putBoolean("useMap",checked).apply();updateMapControls();});
         refreshMapRoute(getSharedPreferences("generator",MODE_PRIVATE).getBoolean("useMap",false));
-        LinearLayout acts=new LinearLayout(this);box.addView(acts);btn(acts,"预览",v->generate(true));generateButton=btn(acts,"生成并另存为",v->generate(false));btn(box,"分享最近文件",v->share());btn(box,"打开实时模拟定位",v->startActivity(new Intent(this,MainActivity.class)));result=txt(box,"尚未生成。",15,Color.rgb(0,119,101));txt(box,"点击“生成并另存为”后，在系统保存窗口选择文件夹并确认文件名，例如保存到 Download（下载）文件夹。",13,Color.DKGRAY);txt(box,"生成文件可用于测试轨迹展示和导入流程。Keep 是否接受 GPX/FIT 取决于其当前版本支持和校验；本页面不绕过 Keep 校验。",13,Color.DKGRAY);
+        LinearLayout acts=new LinearLayout(this);box.addView(acts);btn(acts,"预览",v->generate(true));generateButton=btn(acts,"生成并另存为",v->generate(false));btn(box,"分享最近文件",v->share());result=txt(box,"尚未生成。",15,Color.rgb(0,119,101));txt(box,"点击“生成并另存为”后，在系统保存窗口选择文件夹并确认文件名，例如保存到 Download（下载）文件夹。",13,Color.DKGRAY);txt(box,"生成文件可用于测试轨迹展示和导入流程。Keep 是否接受 GPX/FIT 取决于其当前版本支持和校验；本页面不绕过 Keep 校验。",13,Color.DKGRAY);
         if(b!=null){useLaps.setChecked(b.getBoolean("useLaps",useLaps.isChecked()));lapCount.setText(b.getString("lapCount",lapCount.getText().toString()));}
         restoreFormState(b);
         for(EditText field:formFields())if(field!=distance&&field!=pace)field.addTextChangedListener(calculator);

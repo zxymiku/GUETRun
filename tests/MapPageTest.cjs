@@ -1,5 +1,5 @@
 // Uses a local AMap stub: checks editor interactions, not the live map service.
-const fs=require('fs'),path=require('path'),assert=require('assert');
+const fs=require('fs'),path=require('path'),os=require('os'),assert=require('assert');
 const { chromium }=require('playwright');
 const html=fs.readFileSync(path.join(__dirname,'../app/src/main/assets/route-map.html'),'utf8');
 const stub=`(function(){
@@ -78,7 +78,7 @@ const near=(a,b,tol,label)=>assert(Math.abs(a-b)<=tol,`${label}: ${a} vs ${b}`);
   await page.locator('#gesture').click();assert.equal(await page.locator('#draw-layer').isVisible(),false);await clickMap(39.899,116.399);await page.locator('#gesture').click();assert.deepEqual((await save()).points,second.points,'Panning retains drawing');
   await page.locator('[data-mode=track]').click();
   for(const viewport of [{width:393,height:852},{width:360,height:640}]){await page.setViewportSize(viewport);await settle();assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1).map(e=>({tag:e.tagName,id:e.id,cls:e.className,right:e.getBoundingClientRect().right,text:e.textContent.slice(0,30)})))));const b=await page.locator('#map-wrap').boundingBox();assert(b.height>=150,'Map usable height');const saveBox=await page.locator('#save').boundingBox();assert(saveBox.y+saveBox.height<=viewport.height+1,'Save button must remain reachable');}
-  await page.setViewportSize({width:393,height:752});await page.locator('#preset400').click();await page.locator('#place-track').click();await settle();await page.screenshot({path:path.join(__dirname,'../dist/map-editor-v1.6-test.png')});
+  await page.setViewportSize({width:393,height:752});await page.locator('#preset400').click();await page.locator('#place-track').click();await settle();await page.screenshot({path:path.join(os.tmpdir(),'map-editor-v2-test.png')});
   assert.equal(errors.length,0,errors.join('\n'));console.log('Map editor passed: mobile layout, repeated points, stadium shape, scale/rotate/move, laps, restore, drafts, line edits, multi-stroke drawing, undo/redo and cancel (stub API).');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

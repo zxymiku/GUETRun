@@ -24,7 +24,7 @@ usage() {
 参数：
   --from     上一次 Release 的标签；为空或不存在时按首次发布处理
   --to       本次发布的提交引用，默认 HEAD
-  --version  版本号，例如 1.7.1
+  --version  版本号，例如 2.0.1
   --tag      本次 Release 标签，默认 v<版本号>
   --repo     GitHub 仓库，例如 owner/repo；默认读取 GITHUB_REPOSITORY
   --output   生成的 Markdown 文件路径，必填
@@ -146,7 +146,7 @@ cut -f1 "$COMMITS_FILE" | LC_ALL=C sort | uniq -c | sed "s/^ *//; s/ /${TAB}/" |
 AUTHOR_COUNT=$(wc -l < "$AUTHORS_FILE" | tr -d ' ')
 
 {
-  echo "# 跑步模拟器 v${VERSION}"
+  echo "# 运动数据生成器 v${VERSION}"
   echo
   echo "> **范围**：${RANGE_TEXT} · **提交**：${COMMIT_COUNT} 个（不含合并提交） · **提交人**：${AUTHOR_COUNT} 人"
   echo

@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "版本号（例如 1.7.1）；留空读取 app/build.gradle"
+        description: "版本号（例如 2.0.1）；留空读取 app/build.gradle"
         required: false
         type: string
       version_code:
@@ -14,7 +14,7 @@ on:
         required: false
         type: string
       tag:
-        description: "Release 标签（例如 v1.7.1）；留空自动使用 v<版本号>"
+        description: "Release 标签（例如 v2.0.1）；留空自动使用 v<版本号>"
         required: false
         type: string
       prerelease:
@@ -77,7 +77,7 @@ jobs:
             exit 1
           fi
           if ! [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+){0,3}([-+][0-9A-Za-z.-]+)?$ ]]; then
-            echo "::error::版本号格式无效：$VERSION（示例：1.7.1、1.7.0-beta.1）"
+            echo "::error::版本号格式无效：$VERSION（示例：2.0.1、2.1.0-beta.1）"
             exit 1
           fi
           if ! [[ "$VERSION_CODE" =~ ^(0|[1-9][0-9]*)$ ]]; then
@@ -191,7 +191,7 @@ jobs:
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -f "$APK"
 
-          ASSET_NAME="run-simulator-v${{ steps.meta.outputs.version }}-debug.apk"
+          ASSET_NAME="run-data-generator-v${{ steps.meta.outputs.version }}-debug.apk"
           mkdir -p "$RUNNER_TEMP/release"
           cp "$APK" "$RUNNER_TEMP/release/$ASSET_NAME"
 
@@ -211,7 +211,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: run-simulator-v${{ steps.meta.outputs.version }}-debug
+          name: run-data-generator-v${{ steps.meta.outputs.version }}-debug
           path: ${{ runner.temp }}/release/*.apk
           if-no-files-found: error
           retention-days: 30
