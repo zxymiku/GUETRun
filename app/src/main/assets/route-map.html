@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; script-src 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'unsafe-inline' https:; img-src https: data: blob:; connect-src https: wss:; worker-src blob: https:; object-src 'none'; base-uri 'none'">
+<title>跑道与路线编辑</title><style>
+*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:system-ui,sans-serif;color:#14232c;background:#f6f8fa}body{display:flex;flex-direction:column;overflow:hidden}button,input{font:inherit;font-size:13px;border:1px solid #cfddd6;border-radius:8px;padding:8px;background:white;color:#14232c}button{cursor:pointer;touch-action:manipulation}button.active,.primary{background:#007765;color:white;border-color:#007765}button:disabled{opacity:.4}input{min-width:0}input[type=range]{padding:0;accent-color:#007765;height:28px;flex:1;min-width:65px}input[type=number]{width:76px}input[type=checkbox]{accent-color:#007765;width:17px;height:17px;vertical-align:middle}.bar{display:flex;gap:6px;padding:4px 8px;flex-wrap:wrap;align-items:center}.bar input[type=search]{flex:1}.modes button{flex:1;padding:9px 4px}.hint{padding:4px 10px;font-size:12px;line-height:1.4}#message{color:#006955;min-height:25px}#map-wrap{flex:1;min-height:150px;position:relative}#map{position:absolute;inset:0}#draw-layer,#handles{position:absolute;inset:0;z-index:120}#draw-layer{display:none;touch-action:none;cursor:crosshair}#handles{pointer-events:none;z-index:121}.handle{position:absolute;transform:translate(-50%,-50%);padding:0;width:38px;height:38px;border:2px solid white;border-radius:50%;box-shadow:0 1px 6px #324c4780;background:#007765;color:white;pointer-events:auto;touch-action:none;user-select:none;font-size:18px}.vertex{width:26px;height:26px;background:#fff;border:3px solid #007765}.handle.scale{background:#2261b0}.handle.rotate{background:#a36808}#empty{position:absolute;inset:0;z-index:130;background:#eaf2ee;display:flex;justify-content:center;align-items:center;padding:24px;text-align:center;line-height:1.7}#search-results{max-height:120px;overflow:auto;display:none;background:white}#search-results button{display:block;border:0;border-radius:0;width:100%;text-align:left;border-bottom:1px solid #eee}.foot{padding:5px 8px max(6px,env(safe-area-inset-bottom));border-top:1px solid #dce4e0}#save{width:100%;font-size:15px;font-weight:600}#stats{font-variant-numeric:tabular-nums}.muted{color:#586b65;font-size:12px}#track-settings{border-bottom:1px solid #dce4e0;font-size:12px}#track-settings summary{padding:5px 10px;cursor:pointer}#track-settings .bar{padding-top:2px;padding-bottom:2px}#scale-label,#angle-label{min-width:36px}#laps{width:56px}#gesture{font-weight:600}.toolbar{flex-wrap:nowrap;gap:4px}.toolbar button{padding:8px 5px;font-size:12px;white-space:nowrap}.tool-scroller{overflow-x:auto;flex-shrink:0}#length-text{font-size:14px;font-weight:600}.legend{position:absolute;left:7px;top:7px;background:#fffffff0;border-radius:7px;padding:5px 8px;font-size:11px;pointer-events:none;z-index:122;display:none;max-width:70%}
+#editor-head{flex:0 1 auto;min-height:0;max-height:48%;overflow-y:auto;overflow-x:hidden}#map-wrap{overflow:hidden}.foot{flex-shrink:0}
+</style></head><body><div id="editor-head">
+<form id="search-form" class="bar"><input id="search" type="search" placeholder="搜索城市、学校、公园或地址" maxlength="100"><button>搜索</button><button type="button" id="layer">卫星图</button></form>
+<div id="search-results"></div>
+<div class="bar modes"><button data-mode="point">选点</button><button data-mode="track" class="active">田径跑道</button><button data-mode="line">连线</button><button data-mode="draw">手绘</button></div>
+<details id="track-settings" open><summary>跑道大小、比例与方向</summary>
+ <div class="bar"><button id="preset400">400 m</button><button id="preset800">800 m</button><label>单圈 <input id="perimeter" type="number" min="40" max="20000" step="1" value="400"> m</label><button id="place-track">放在地图中央</button></div>
+ <div class="bar"><span>缩放</span><input id="scale" aria-label="跑道缩放" type="range" min="50" max="200" value="100"><span id="scale-label">100%</span><span>直道占比</span><input id="ratio" aria-label="直道比例" type="range" min="10" max="85" value="42.195"></div>
+ <div class="bar"><span>旋转</span><input id="angle" aria-label="跑道方向" type="range" min="0" max="359" value="90"><span id="angle-label">90°</span><button id="rotate90">转 90°</button></div>
+</details>
+<div class="tool-scroller"><div class="bar toolbar"><button id="gesture">移动地图</button><button id="undo">撤销</button><button id="redo">重做</button><button id="clear">清空</button><button id="fit">查看全线</button><label><input id="closed" type="checkbox" checked>闭合</label></div></div>
+<div id="message" class="hint" role="status">正在准备地图…</div>
+</div><div id="map-wrap"><div id="map"></div><div id="draw-layer"></div><div id="handles"></div><div id="track-legend" class="legend">＋ 移动中心 · ↔ 缩放 · ↻ 旋转</div><div id="empty">首次使用请点上方“地图密钥 / 申请说明”，填写高德 Web端 Key 和安全密钥。<br>地图需要联网，文件在本机生成。</div></div>
+<div class="foot"><div class="bar"><label><input id="use-laps" type="checkbox" checked>按圈数生成</label><label><input id="laps" aria-label="圈数" type="number" min="1" max="1000" step="1" value="1"> 圈</label><span class="muted">关闭则按首页里程</span></div><div id="stats" class="hint">尚未绘制路线</div><button id="save" class="primary" disabled>保存并使用路线</button></div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id),rad=Math.PI/180,R=6371000;
+const toMap=p=>[p[1],p[0]],fromMap=p=>[p.getLat(),p.getLng()],copy=p=>p.map(q=>q.slice());
+let map,marker,line,placeSearch,mode='track',center=null,points=[],satellite=false,booted=false,mapReady=false;
+let history=[],future=[],drafts={},pan=false,frame=0,dirty=true,drawing=null,handleDrag=null,suppressClick=0;
+let track={perimeter:400,ratio:.42195,bearing:90},basePerimeter=400,trackGeometry=null,handleSignature='',initialCenter;
+const msg=t=>$('message').textContent=t;
+function distance(a,b){const x=Math.sin((b[0]-a[0])*rad/2),y=Math.sin((b[1]-a[1])*rad/2);return 2*R*Math.asin(Math.sqrt(Math.min(1,x*x+Math.cos(a[0]*rad)*Math.cos(b[0]*rad)*y*y)));}
+function pathLength(p,closed){let n=0;for(let i=1;i<p.length;i++)n+=distance(p[i-1],p[i]);if(closed&&p.length>1)n+=distance(p[p.length-1],p[0]);return n;}
+function destination(c,east,north){const d=Math.hypot(east,north)/R,b=Math.atan2(east,north),la=c[0]*rad,lo=c[1]*rad,l=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(b));return [l/rad,(lo+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(l)))/rad];}
+function gcj(p){const [lat,lon]=p;if(lon<72.004||lon>137.8347||lat<.8293||lat>55.8271)return p.slice();const x=lon-105,y=lat-35;
+ let dy=-100+2*x+3*y+.2*y*y+.1*x*y+.2*Math.sqrt(Math.abs(x));dy+=(20*Math.sin(6*x*Math.PI)+20*Math.sin(2*x*Math.PI))*2/3;dy+=(20*Math.sin(y*Math.PI)+40*Math.sin(y/3*Math.PI))*2/3;dy+=(160*Math.sin(y/12*Math.PI)+320*Math.sin(y*Math.PI/30))*2/3;
+ let dx=300+x+2*y+.1*x*x+.1*x*y+.1*Math.sqrt(Math.abs(x));dx+=(20*Math.sin(6*x*Math.PI)+20*Math.sin(2*x*Math.PI))*2/3;dx+=(20*Math.sin(x*Math.PI)+40*Math.sin(x/3*Math.PI))*2/3;dx+=(150*Math.sin(x/12*Math.PI)+300*Math.sin(x/30*Math.PI))*2/3;
+ const a=6378245,ee=.00669342162296594323,la=lat*rad,magic=1-ee*Math.sin(la)**2,root=Math.sqrt(magic);return [lat+dy*180/(a*(1-ee)/(magic*root)*Math.PI),lon+dx*180/(a/root*Math.cos(la)*Math.PI)];}
+function wgs(p){if(p[1]<72.004||p[1]>137.8347||p[0]<.8293||p[0]>55.8271)return p.slice();let q=p.slice();for(let i=0;i<12;i++){const g=gcj(q),a=g[0]-p[0],b=g[1]-p[1];q[0]-=a;q[1]-=b;if(Math.max(Math.abs(a),Math.abs(b))<1e-10)break;}return q;}
+// Two straight sections joined by semicircles, measured in WGS84 before display conversion.
+function stadium(c,perimeter,ratio,bearing){
+ const origin=wgs(c),theta=bearing*rad;let straight=perimeter*ratio/2,radius=perimeter*(1-ratio)/(2*Math.PI);
+ const project=(x,y)=>destination(origin,x*Math.sin(theta)+y*Math.cos(theta),x*Math.cos(theta)-y*Math.sin(theta));
+ let local=[],geo;for(let i=0;i<=80;i++){const a=-Math.PI/2+i*Math.PI/80;local.push([straight/2+radius*Math.cos(a),radius*Math.sin(a)]);}for(let i=0;i<=80;i++){const a=Math.PI/2+i*Math.PI/80;local.push([-straight/2+radius*Math.cos(a),radius*Math.sin(a)]);}
+ for(let i=0;i<3;i++){geo=local.map(p=>project(p[0],p[1]));const factor=perimeter/pathLength(geo,true);local=local.map(p=>[p[0]*factor,p[1]*factor]);}
+ geo=local.map(p=>project(p[0],p[1]));const end=Math.max(...local.map(p=>p[0]));
+ return {wgs:geo,points:geo.map(gcj),scale:gcj(geo[0]),rotate:gcj(project(end*1.35,0))};
+}
+window.RouteGeometry={distance,pathLength,wgs,gcj,stadium};
+function isClosed(){return mode==='track'||$('closed').checked;}
+function snapshot(){return {points:copy(points),center:center&&center.slice(),track:{...track},closed:$('closed').checked,useLaps:$('use-laps').checked,laps:$('laps').value};}
+function remember(){history.push(snapshot());if(history.length>40)history.shift();future=[];}
+function restore(s){points=copy(s.points);center=s.center&&s.center.slice();track={...s.track};$('closed').checked=s.closed;$('use-laps').checked=s.useLaps;$('laps').value=s.laps;basePerimeter=track.perimeter;syncTrackInputs();trackGeometry=null;dirty=true;schedule();}
+function rebuildTrack(){if(center){trackGeometry=stadium(center,track.perimeter,track.ratio,track.bearing);points=trackGeometry.points;}else{points=[];trackGeometry=null;}dirty=true;schedule();}
+function syncTrackInputs(){ $('perimeter').value=Number(track.perimeter.toFixed(2));$('ratio').value=track.ratio*100;$('angle').value=track.bearing;$('angle-label').textContent=Math.round(track.bearing)+'°';$('scale').value=100;$('scale-label').textContent='100%';}
+function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh();});}
+function refresh(){
+ if(!map)return;const path=points.map(toMap);if(isClosed()&&path.length>1&&!drawing)path.push(path[0]);line.setPath(path);
+ const p=mode==='point'||mode==='track'?center:points[0];if(p){marker.setPosition(toMap(p));marker.show();}else marker.hide();
+ const loop=mode!=='point'&&isClosed();$('closed').disabled=mode==='track'||mode==='point';$('use-laps').disabled=!loop;if(!loop)$('use-laps').checked=false;
+ $('laps').disabled=!loop||!$('use-laps').checked;$('undo').disabled=!history.length;$('redo').disabled=!future.length;
+ $('track-settings').style.display=mode==='track'?'block':'none';$('gesture').textContent=pan?'继续绘制':'移动地图';$('gesture').classList.toggle('active',pan);
+ $('draw-layer').style.display=mode==='draw'&&!pan?'block':'none';$('track-legend').style.display=mode==='track'&&center&&!pan?'block':'none';
+ if(dirty){const real=mode==='track'&&trackGeometry?trackGeometry.wgs:points.map(wgs);window.routeLength=real.length>1?pathLength(real,isClosed()):0;dirty=false;}
+ const laps=Number($('laps').value),validLaps=Number.isInteger(laps)&&laps>=1&&laps<=1000,total=window.routeLength*(loop&&$('use-laps').checked?laps:1);
+ $('save').disabled=mode==='point'?!center:points.length<2||window.routeLength<10||(loop&&$('use-laps').checked&&(!validLaps||total>100000));
+ $('save').textContent=mode==='point'?'使用所选坐标':'保存并使用路线';
+ $('stats').textContent=mode==='point'?(center?'已选坐标，可继续点击重新选点':'点击地图选择位置'):
+ points.length>1?(isClosed()?'单圈 ':'单程 ')+window.routeLength.toFixed(1)+' 米'+(loop&&$('use-laps').checked?' × '+(validLaps?laps:'?')+' 圈 = '+(total/1000).toFixed(3)+' km':' · 按首页里程生成'):'尚未绘制路线';
+ refreshHandles();
+}
+function pixel(p){const v=map.lngLatToContainer(toMap(p));return [v.x===undefined?v.getX():v.x,v.y===undefined?v.getY():v.y];}
+function refreshHandles(){
+ if(!map)return;const holder=$('handles');let defs=[];
+ if(!pan&&!drawing){
+  if(mode==='track'&&center&&trackGeometry)defs=[['center',center,'＋'],['scale',trackGeometry.scale,'↔'],['rotate',trackGeometry.rotate,'↻']];
+  else if(mode==='point'&&center)defs=[['center',center,'＋']];
+  else if(mode==='line'){const step=Math.max(1,Math.ceil(points.length/80));for(let i=0;i<points.length;i++)if(i%step===0||i===points.length-1)defs.push(['vertex',points[i],'',i]);}
+ }
+ const signature=defs.map(d=>d[0]+(d[3]??'')).join(',');
+ if(signature!==handleSignature){holder.replaceChildren();for(const d of defs){const b=document.createElement('button');b.className='handle '+d[0];b.dataset.kind=d[0];if(d[3]!==undefined)b.dataset.index=d[3];b.textContent=d[2];b.setAttribute('aria-label',d[0]==='vertex'?'拖动路线点':d[0]==='scale'?'拖动缩放跑道':d[0]==='rotate'?'拖动旋转跑道':'拖动中心');holder.appendChild(b);}handleSignature=signature;}
+ [...holder.children].forEach((el,i)=>{const [x,y]=pixel(defs[i][1]);el.style.left=x+'px';el.style.top=y+'px';});
+}
+function instructions(){msg(pan?'移动地图中：可拖动和双指缩放；点击“继续绘制”返回。':mode==='track'?'点击放置跑道。拖动绿色＋平移、蓝色↔缩放、橙色↻旋转。':mode==='draw'?'手指画线，下一笔会从终点续接。移动或双指缩放请点“移动地图”。':mode==='line'?'连续点选添加拐点；拖动圆点微调。拖动空白处可移动地图。':'可反复点击或拖动绿色＋重新选点，完成后再保存。');}
+function setMode(next){
+ if(!map||drawing||handleDrag||next===mode)return;
+ drafts[mode]={state:snapshot(),history,future};const previousCenter=center;
+ mode=next;history=[];future=[];pan=false;handleSignature='';$('handles').replaceChildren();
+ if(drafts[mode]){history=drafts[mode].history;future=drafts[mode].future;restore(drafts[mode].state);}
+ else {points=[];center=mode==='track'?(previousCenter&&previousCenter.slice()):null;trackGeometry=null;$('closed').checked=true;$('use-laps').checked=mode!=='point';$('laps').value=1;if(mode==='track')rebuildTrack();}
+ if(mode==='track'&&center)rebuildTrack();dirty=true;document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));map.setStatus({dragEnable:true,zoomEnable:true,doubleClickZoom:false});refresh();instructions();
+}
+function mapClick(p){
+ if(pan||mode==='draw'||handleDrag||drawing||Date.now()<suppressClick)return;
+ if((mode==='line')&&points.length&&distance(points[points.length-1],p)<.3)return;
+ remember();if(mode==='point'){center=p;dirty=true;}
+ else if(mode==='track'){center=p;rebuildTrack();}
+ else if(points.length<2000){points.push(p);center=points[0];dirty=true;}
+ else {history.pop();msg('控制点已达 2000 个，请简化路线');return;}refresh();instructions();
+}
+window.boot=function(state){
+ if(booted)return;booted=true;initialCenter=state.center;
+ if(!state.key||!state.security){msg('尚未配置高德地图密钥');return;}
+ $('empty').textContent='正在连接高德地图…';window._AMapSecurityConfig={securityJsCode:state.security};
+ const timeout=setTimeout(()=>{if(!mapReady){$('empty').textContent='地图连接超时，请检查网络、密钥或域名白名单后重载。';msg('地图图层暂未加载');}},25000);
+ const sdk=document.createElement('script');sdk.src='https://webapi.amap.com/maps?v=2.0&key='+encodeURIComponent(state.key)+'&plugin=AMap.PlaceSearch,AMap.Scale,AMap.ToolBar';
+ sdk.onerror=()=>{clearTimeout(timeout);$('empty').textContent='无法连接高德地图，请检查网络后重载。';msg('地图加载失败');};
+ sdk.onload=()=>{try{
+  if(!window.AMap||!AMap.Map)throw Error('地图密钥未通过校验');
+  map=new AMap.Map('map',{zoom:18,zooms:[3,20],center:toMap(state.center),viewMode:'2D',resizeEnable:true,doubleClickZoom:false,showBuildingBlock:true,features:['bg','road','building','point']});
+  map.addControl(new AMap.Scale());map.addControl(new AMap.ToolBar({position:{right:'10px',top:'10px'}}));
+  marker=new AMap.Marker({anchor:'bottom-center',clickable:false,bubble:true});marker.setMap(map);marker.hide();
+  line=new AMap.Polyline({path:[],strokeColor:'#007765',strokeWeight:5,strokeOpacity:.9,lineJoin:'round',lineCap:'round',showDir:true,bubble:true,clickable:false});line.setMap(map);
+  placeSearch=new AMap.PlaceSearch({pageSize:6,extensions:'base'});
+  map.on('complete',()=>{mapReady=true;clearTimeout(timeout);$('empty').style.display='none';refreshHandles();});
+  map.on('error',()=>msg('高德返回错误，请核对密钥、配额或域名白名单。'));
+  ['mapmove','zoomchange','resize','moveend','zoomend'].forEach(e=>map.on(e,refreshHandles));
+  $('empty').style.display='none';map.on('click',e=>mapClick(fromMap(e.lnglat)));
+  if(state.points&&state.points.length>1){mode=['track','draw','line'].includes(state.mode)?state.mode:'line';points=state.points;center=points[0];$('closed').checked=!!state.closed;$('use-laps').checked=state.laps>0;$('laps').value=state.laps>0?state.laps:1;
+   if(mode==='track'&&state.editor){track={perimeter:state.editor.perimeter,ratio:state.editor.ratio,bearing:state.editor.bearing};center=gcj(state.editor.center);basePerimeter=track.perimeter;syncTrackInputs();rebuildTrack();}
+   else if(mode==='track')mode='line';
+  }
+  document.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));dirty=true;refresh();if(points.length)map.setFitView([line],false,[40,40,40,40],19);instructions();
+ }catch(e){clearTimeout(timeout);$('empty').style.display='flex';$('empty').textContent='地图初始化失败，请检查密钥后重载。';msg(String(e.message||e));}};document.head.appendChild(sdk);
+};
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+function trackChange(fn){if(!map)return;remember();fn();rebuildTrack();syncTrackInputs();}
+$('preset400').onclick=()=>trackChange(()=>{track.perimeter=400;basePerimeter=400;});$('preset800').onclick=()=>trackChange(()=>{track.perimeter=800;basePerimeter=800;});
+$('perimeter').onchange=()=>{const n=Number($('perimeter').value);if(!Number.isFinite(n)||n<40||n>20000){syncTrackInputs();msg('单圈长度范围为 40–20000 米');return;}trackChange(()=>{track.perimeter=n;basePerimeter=n;});};
+for(const id of ['scale','ratio','angle']){
+ $(id).onpointerdown=()=>{if(map)remember();};$(id).onkeydown=e=>{if(map&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key))remember();};
+ $(id).oninput=()=>{if(!map)return;if(id==='scale'){track.perimeter=Math.max(40,Math.min(20000,basePerimeter*Number($('scale').value)/100));$('perimeter').value=Number(track.perimeter.toFixed(2));$('scale-label').textContent=$('scale').value+'%';}
+  if(id==='ratio')track.ratio=Number($('ratio').value)/100;if(id==='angle'){track.bearing=Number($('angle').value);$('angle-label').textContent=track.bearing+'°';}rebuildTrack();};
+}
+$('rotate90').onclick=()=>trackChange(()=>{track.bearing=(track.bearing+90)%360;});
+$('place-track').onclick=()=>trackChange(()=>{center=fromMap(map.getCenter());});
+$('gesture').onclick=()=>{if(!map||drawing||handleDrag)return;pan=!pan;map.setStatus({dragEnable:true,zoomEnable:true,doubleClickZoom:false});refresh();instructions();};
+$('closed').onchange=()=>{dirty=true;refresh();};$('use-laps').onchange=()=>refresh();$('laps').oninput=()=>refresh();
+$('undo').onclick=()=>{if(!history.length||drawing||handleDrag)return;future.push(snapshot());restore(history.pop());if(mode==='track'&&center)rebuildTrack();};
+$('redo').onclick=()=>{if(!future.length||drawing||handleDrag)return;history.push(snapshot());restore(future.pop());if(mode==='track'&&center)rebuildTrack();};
+$('clear').onclick=()=>{if(!map||drawing||handleDrag)return;remember();points=[];center=null;trackGeometry=null;dirty=true;refresh();msg('当前草稿已清空，可撤销恢复。');};
+$('fit').onclick=()=>{if(map&&points.length>1)map.setFitView([line],false,[40,40,40,40],20);else if(map&&center)map.setCenter(toMap(center));};
+$('layer').onclick=()=>{if(!map)return;satellite=!satellite;map.setLayers(satellite?[new AMap.TileLayer.Satellite(),new AMap.TileLayer.RoadNet()]:[new AMap.TileLayer()]);$('layer').textContent=satellite?'标准图':'卫星图';};
+$('search-form').onsubmit=e=>{e.preventDefault();if(!placeSearch){msg('请先配置密钥并等待地图加载');return;}const keyword=$('search').value.trim();if(!keyword)return;msg('正在搜索…');
+ const request=Symbol();window.searchRequest=request;placeSearch.search(keyword,(status,result)=>{if(window.searchRequest!==request)return;const container=$('search-results');container.replaceChildren();if(status!=='complete'||!result.poiList||!result.poiList.pois.length){container.style.display='none';msg('没有找到地点，或搜索请求失败，请补充城市名称并检查配额。');return;}
+ result.poiList.pois.filter(p=>p.location).forEach(p=>{const b=document.createElement('button');b.type='button';b.textContent=p.name+' · '+(p.cityname||'')+(p.adname||'');b.onclick=()=>{map.setZoomAndCenter(18,p.location);container.style.display='none';instructions();};container.appendChild(b);});container.style.display='block';msg('请选择搜索结果');});};
+function eventPoint(e){const rect=$('map').getBoundingClientRect();return fromMap(map.containerToLngLat(new AMap.Pixel(e.clientX-rect.left,e.clientY-rect.top)));}
+function bearing(a,b){const la=a[0]*rad,lb=b[0]*rad,d=(b[1]-a[1])*rad;return (Math.atan2(Math.sin(d)*Math.cos(lb),Math.cos(la)*Math.sin(lb)-Math.sin(la)*Math.cos(lb)*Math.cos(d))/rad+360)%360;}
+const holder=$('handles');
+holder.onpointerdown=e=>{
+ const el=e.target.closest('.handle');if(!el||pan||drawing||handleDrag)return;e.preventDefault();e.stopPropagation();remember();
+ handleDrag={id:e.pointerId,element:el,kind:el.dataset.kind,index:Number(el.dataset.index),before:snapshot(),perimeter:track.perimeter,startDistance:center?distance(center,eventPoint(e)):1};
+ el.setPointerCapture(e.pointerId);map.setStatus({dragEnable:false,zoomEnable:false});suppressClick=Date.now()+500;
+};
+holder.onpointermove=e=>{if(!handleDrag||e.pointerId!==handleDrag.id)return;e.preventDefault();e.stopPropagation();const p=eventPoint(e),d=handleDrag;
+ if(d.kind==='center'){center=p;if(mode==='track')rebuildTrack();}
+ if(d.kind==='vertex'){points[d.index]=p;center=points[0];}
+ if(d.kind==='scale'){track.perimeter=Math.max(40,Math.min(20000,d.perimeter*distance(center,p)/Math.max(.1,d.startDistance)));basePerimeter=track.perimeter;syncTrackInputs();rebuildTrack();}
+ if(d.kind==='rotate'){track.bearing=bearing(center,p);syncTrackInputs();rebuildTrack();}
+ dirty=true;schedule();};
+function endHandle(e,cancel){if(!handleDrag||e.pointerId!==handleDrag.id)return;e.preventDefault();e.stopPropagation();const before=handleDrag.before;handleDrag=null;if(cancel){history.pop();restore(before);if(mode==='track')rebuildTrack();}map.setStatus({dragEnable:true,zoomEnable:true,doubleClickZoom:false});suppressClick=Date.now()+350;dirty=true;refresh();}
+holder.onpointerup=e=>endHandle(e,false);holder.onpointercancel=e=>endHandle(e,true);
+// One refresh per animation frame, with screen-distance sampling and endpoint-preserving simplification.
+function simplify(input,tolerance){if(input.length<3)return input;const pixels=input.map(pixel),keep=new Set([0,input.length-1]),stack=[[0,input.length-1]];
+ while(stack.length){const [a,b]=stack.pop(),p=pixels[a],q=pixels[b],dx=q[0]-p[0],dy=q[1]-p[1],l=dx*dx+dy*dy;let best=tolerance*tolerance,index=-1;
+  for(let i=a+1;i<b;i++){const t=l?Math.max(0,Math.min(1,((pixels[i][0]-p[0])*dx+(pixels[i][1]-p[1])*dy)/l)):0,d=(pixels[i][0]-p[0]-t*dx)**2+(pixels[i][1]-p[1]-t*dy)**2;if(d>best){best=d;index=i;}}
+  if(index>=0){keep.add(index);stack.push([a,index],[index,b]);}
+ }return [...keep].sort((a,b)=>a-b).map(i=>input[i]);}
+const drawLayer=$('draw-layer');
+drawLayer.onpointerdown=e=>{if(!map||mode!=='draw'||pan||drawing||handleDrag)return;e.preventDefault();remember();drawing={id:e.pointerId,before:snapshot(),start:points.length?points.length-1:0,last:[e.clientX,e.clientY]};drawLayer.setPointerCapture(e.pointerId);const p=eventPoint(e);if(!points.length||distance(points[points.length-1],p)>.1)points.push(p);center=points[0];dirty=true;schedule();};
+drawLayer.onpointermove=e=>{if(!drawing||e.pointerId!==drawing.id)return;e.preventDefault();const coalesced=e.getCoalescedEvents?e.getCoalescedEvents():[];for(const sample of (coalesced.length?coalesced:[e])){if(Math.hypot(sample.clientX-drawing.last[0],sample.clientY-drawing.last[1])>=2&&points.length<4000){points.push(eventPoint(sample));drawing.last=[sample.clientX,sample.clientY];}}dirty=true;schedule();};
+drawLayer.onpointerup=e=>{if(!drawing||e.pointerId!==drawing.id)return;e.preventDefault();const p=eventPoint(e);if(points.length<4000&&distance(points[points.length-1],p)>.05)points.push(p);const start=drawing.start;points=points.slice(0,start).concat(simplify(points.slice(start),.8));drawing=null;center=points[0];dirty=true;refresh();msg('已续接到路线末端，可继续画下一笔；移动和双指缩放请点“移动地图”。');};
+drawLayer.onpointercancel=e=>{if(!drawing||e.pointerId!==drawing.id)return;const before=drawing.before;drawing=null;history.pop();restore(before);};
+$('save').onclick=()=>{if(!map||drawing||handleDrag)return;refresh();if($('save').disabled)return;const laps=mode!=='point'&&isClosed()&&$('use-laps').checked?Number($('laps').value):0;
+ try{RouteApp.save(JSON.stringify({mode,center:center||points[0],points,closed:isClosed(),laps,editor:mode==='track'?{...track}:undefined}));}catch(e){msg('保存失败，请返回后重新打开地图');}};
+</script></body></html>

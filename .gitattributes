@@ -1,0 +1,33 @@
+# 统一跨平台换行，避免 GitHub Actions 中的 shell 脚本因 CRLF 失败。
+* text=auto eol=lf
+
+# Windows 批处理与 PowerShell 保持 CRLF。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 仓库内 shell 脚本与 gradlew 必须为 LF。
+*.sh text eol=lf
+gradlew text eol=lf
+
+# 文本源码与文档。
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.java text eol=lf
+*.py text eol=lf
+*.html text eol=lf
+*.cjs text eol=lf
+
+# 二进制文件不做换行转换。
+*.apk binary
+*.aab binary
+*.idsig binary
+*.jar binary
+*.zip binary
+*.keystore binary
+*.jks binary
+*.fit binary
+*.png binary
+*.jpg binary
+*.webp binary

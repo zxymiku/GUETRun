@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手绘路线工具 — keep-data-sim</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; height: 100vh; }
+  #map { flex: 1; }
+  #sidebar {
+    width: 320px; background: #1a1a2e; color: #eee; display: flex; flex-direction: column;
+    padding: 16px; gap: 12px; overflow-y: auto;
+  }
+  #sidebar h2 { font-size: 18px; color: #e94560; margin-bottom: 4px; }
+  #sidebar p { font-size: 13px; color: #aaa; line-height: 1.5; }
+  .btn {
+    padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 14px; font-weight: 600; transition: background 0.2s;
+  }
+  .btn-primary { background: #e94560; color: #fff; }
+  .btn-primary:hover { background: #c73e54; }
+  .btn-secondary { background: #16213e; color: #eee; border: 1px solid #333; }
+  .btn-secondary:hover { background: #0f3460; }
+  .btn-danger { background: #533; color: #f88; border: 1px solid #644; }
+  .btn-danger:hover { background: #644; }
+  #info { font-size: 13px; color: #aaa; }
+  #info span { color: #e94560; font-weight: 600; }
+  #points-list {
+    flex: 1; overflow-y: auto; font-size: 12px; font-family: monospace;
+    background: #0f0f23; border-radius: 6px; padding: 8px; min-height: 100px;
+  }
+  .point-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 4px 6px; border-bottom: 1px solid #222;
+  }
+  .point-item .idx { color: #e94560; width: 24px; }
+  .point-item .coords { color: #aaa; flex: 1; }
+  .point-item button {
+    background: none; border: none; color: #f66; cursor: pointer; font-size: 14px; padding: 2px 4px;
+  }
+  #preview-json {
+    font-size: 11px; font-family: monospace; background: #0f0f23; color: #8f8;
+    border-radius: 6px; padding: 8px; max-height: 120px; overflow-y: auto;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .btn-row { display: flex; gap: 8px; }
+  .btn-row .btn { flex: 1; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="sidebar">
+  <h2>手绘路线工具</h2>
+  <p>在地图上 <strong>点击</strong> 添加途经点。<br>右键标记可删除单个点。</p>
+
+  <div id="info">
+    途经点: <span id="count">0</span> &nbsp;|&nbsp;
+    总距离: <span id="distance">0</span> m
+  </div>
+
+  <div id="points-list"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-danger" onclick="clearAll()">清空</button>
+    <button class="btn btn-secondary" onclick="undoLast()">撤销</button>
+  </div>
+
+  <div id="preview-json"></div>
+
+  <button class="btn btn-primary" onclick="exportJSON()">导出 JSON 文件</button>
+  <button class="btn btn-secondary" onclick="copyJSON()">复制到剪贴板</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const EARTH_R = 6371000;
+function haversine(lat1, lon1, lat2, lon2) {
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return EARTH_R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+const map = L.map('map').setView([39.9042, 116.4074], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap', maxZoom: 19
+}).addTo(map);
+
+let points = [];
+let markers = [];
+let polyline = null;
+
+function addPoint(lat, lng) {
+  points.push({lat, lng});
+  const marker = L.circleMarker([lat, lng], {
+    radius: 6, color: '#e94560', fillColor: '#e94560', fillOpacity: 0.8
+  }).addTo(map);
+  marker.on('contextmenu', () => removePoint(points.length - 1));
+  markers.push(marker);
+  refresh();
+}
+
+function removePoint(idx) {
+  points.splice(idx, 1);
+  markers[idx].remove();
+  markers.splice(idx, 1);
+  refresh();
+}
+
+function clearAll() {
+  markers.forEach(m => m.remove());
+  markers = [];
+  points = [];
+  refresh();
+}
+
+function undoLast() {
+  if (markers.length) {
+    markers.pop().remove();
+    points.pop();
+    refresh();
+  }
+}
+
+function refresh() {
+  if (polyline) { polyline.remove(); polyline = null; }
+  if (points.length >= 2) {
+    polyline = L.polyline(points.map(p => [p.lat, p.lng]), {
+      color: '#e94560', weight: 3, dashArray: '8,4'
+    }).addTo(map);
+  }
+
+  document.getElementById('count').textContent = points.length;
+  let dist = 0;
+  for (let i = 1; i < points.length; i++) {
+    dist += haversine(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+  }
+  document.getElementById('distance').textContent = Math.round(dist);
+
+  const list = document.getElementById('points-list');
+  list.innerHTML = points.map((p, i) =>
+    `<div class="point-item">
+      <span class="idx">${i+1}</span>
+      <span class="coords">${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}</span>
+      <button onclick="removePoint(${i})">&times;</button>
+    </div>`
+  ).join('');
+
+  const json = JSON.stringify({points: points.map(p => ({lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6)}))}, null, 2);
+  document.getElementById('preview-json').textContent = json;
+}
+
+map.on('click', e => addPoint(e.latlng.lat, e.latlng.lng));
+
+function buildExportData() {
+  return {points: points.map(p => ({lat: +p.lat.toFixed(6), lng: +p.lng.toFixed(6)}))};
+}
+
+function exportJSON() {
+  if (points.length < 2) { alert('至少需要 2 个途经点'); return; }
+  const data = buildExportData();
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'hand_drawn_route.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function copyJSON() {
+  if (points.length < 2) { alert('至少需要 2 个途经点'); return; }
+  navigator.clipboard.writeText(JSON.stringify(buildExportData(), null, 2)).then(
+    () => alert('已复制到剪贴板'),
+    () => alert('复制失败')
+  );
+}
+
+refresh();
+</script>
+</body>
+</html>
