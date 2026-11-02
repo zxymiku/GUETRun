@@ -149,15 +149,37 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android 35 platform and build-tools
+      - name: Ensure Android 35 SDK
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+
+          # ubuntu-latest 预装 Android 35 与 build-tools 35.0.0；仅在缺失时安装，
+          # 避免 android-actions/setup-android 安装已下线的 "tools" 包而失败。
+          if [ ! -f "$SDK_ROOT/platforms/android-35/android.jar" ] || [ ! -d "$SDK_ROOT/build-tools/35.0.0" ]; then
+            echo "Android 35 packages missing; installing..."
+            SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+            if [ ! -x "$SDKMANAGER" ]; then
+              SDKMANAGER=""
+              if [ -d "$SDK_ROOT/cmdline-tools" ]; then
+                SDKMANAGER=$(find "$SDK_ROOT/cmdline-tools" -maxdepth 3 -name sdkmanager -type f 2>/dev/null | head -n1 || true)
+              fi
+            fi
+            if [ -z "${SDKMANAGER:-}" ] || [ ! -x "$SDKMANAGER" ]; then
+              echo "::error::未找到 sdkmanager，无法安装 Android 35 SDK"
+              exit 1
+            fi
+            yes | "$SDKMANAGER" --licenses >/dev/null || true
+            "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+          fi
+
+          test -f "$SDK_ROOT/platforms/android-35/android.jar"
+          test -d "$SDK_ROOT/build-tools/35.0.0"
+          echo "Android SDK ready: $SDK_ROOT"
+          echo "Platforms: $(ls "$SDK_ROOT/platforms" | tr '\n' ' ')"
 
       - name: Run Java checks
         shell: bash
